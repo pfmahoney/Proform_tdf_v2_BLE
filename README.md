@@ -1,6 +1,5 @@
-# Proform_tdf_v2_BLE
 
-# ProForm TdF Pro 4.0 BLE Conversion
+# ProForm TdF Pro 4.0 iFit to Waveshare BLE Conversion
 
 This project replaces the original iFit-based display on a ProForm Tour de France Pro 4.0 bicycle trainer from approximately 2012-2016 with a modern ESP32-based controller and display. It converts the trainer from a proprietary Wi-Fi–dependent design into a native Bluetooth Low Energy (BLE) smart trainer which is directly compatible with modern training platforms.  It also resolves an issue where the built-in original Proform iFit display gets stuck in an endless boot-loop and the bike stops working because the display doesn't work any more.   
 
