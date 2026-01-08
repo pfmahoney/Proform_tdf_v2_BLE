@@ -47,6 +47,8 @@ Specifically the goal is to replace the "ProForm TDF Pro 4.0 Bike 7" Display Tou
 - ProForm Tour de France Pro 4.0 from approximately 2012 to 2016
 - may work with other Proform TdF models but I haven't tested
 
+Note that the motor control to raise and lower the bicycle is not enabled by this code.  Honestly I found it a bit annoying to use for years - I bought the bike thinking it would be cool but after a decade of hearing the motor move the bike up and down, I decided I didn't need that feature any more.   If you really love the bike tilting, it shouldn't be THAT hard to enable it.   But I have it disabled.
+
 ### Software
 - Zwift
 - Rouvy
