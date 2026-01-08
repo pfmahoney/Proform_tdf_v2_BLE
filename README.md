@@ -56,3 +56,11 @@ Specifically the goal is to replace the "ProForm TDF Pro 4.0 Bike 7" Display Tou
 Other BLE-capable training applications may work but have not been fully tested.
 
 ---
+
+## Acknowledgements
+
+This project was inspired by the work of @kevinmott09:
+https://github.com/kevinmott09/proformBLE
+
+While this implementation is a complete rewrite, the original project demonstrated that replacing the factory iFit console on the ProForm TdF platform was feasible and served as the initial inspiration and I used his reverse-engineering of the cadence and resistance values as well as the RS-485 connectivity as the basis for my code.  Without the example from @kevinmott09, there's a high probability my Proform TdF v4 Pro would be headed over to  metal scrap recycling.
+
