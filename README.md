@@ -65,9 +65,10 @@ Other BLE-capable training applications may work but have not been fully tested.
 ## Installation
 
 Remove all of the philips head screws holding the original iFit display to the bike frame.   Take everything above the handlebars off and unplug the shifters and the RS-485 connector to the lower bicycle circuit board.  The just pull back the red connectors and then the other connector slides out.   It should look like this:
-![ESP32-S3 console replacement](images/console_replacement.jpg)
+![Proform disassembled ready for Waveshare](images/ready_for_waveshare.jpg)
 
 Optional but useful step, snip the cables for the shifter buttons and the RS-485 from the iFit console - this makes it easy to attach and remove the new board.
+![Optionally cut the cables with the plugs from the old iFit console](images/ifit_disassemble.jpg)
 
 Connect the 4-wire RS-485 black, blue and green wires to the Waveshare RS-485 port which is midway down the right side on the Waveshare board looking from the back and is silkscreened "RS485".   
 - Bike RS-485 blue wire goes to RS-485 black silkscreen label "A"
@@ -83,12 +84,12 @@ UART1 3V3 - the red wire - is unconnected
 
 That is all the wiring.   You don't *need* to solder them, you could strip them, twist them and cover them with shrink tape or electrical tape.  But ideally you want to solder them.
 
-![ESP32-S3 console replacement](images/console_replacement.jpg)
+![Waveshare wiring and 3D printed case](images/wiring_and_case.jpg)
 
 You will then need to flash the ESP32S3 via the USB connector labelled "USB".  I used VSCode - although I acknowledge that VSCode is intimidating and maybe not the ideal choice if you aren't familiar with it.  I have used VS Code for years and I am still intimidated by it.  But you want to pull it up, create a project in ProjectIO as Arduino, put in the files in the directory structure above with the platformio.ini in the main directory, and and then flash it and build it.   You might be able to get this all working in much less intimidating Arduino IDE, but I use VSCode so I can't help.
 
 The VSCode screen shout look like this:
-![ESP32-S3 console replacement](images/console_replacement.jpg)
+![VSCode Screen](images/vscode_proform.jpg)
 
 ## Acknowledgements
 
