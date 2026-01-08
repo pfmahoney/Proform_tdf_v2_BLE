@@ -14,6 +14,8 @@ The ProForm TdF Pro 4.0 relies on an embedded iFit display and a Wi-Fi communica
 
 The goal is to extend the useful life of otherwise functional hardware and restore compatibility with current training software.
 
+Specifically the goal is to replace the "ProForm TDF Pro 4.0 Bike 7" Display Touchscreen Console Assembly Ebpf01914" with a ~$45 "Waveshare ESP32-S3 7 LCD"
+
 ---
 
 ## Features
