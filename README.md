@@ -77,7 +77,7 @@ Connect the 4-wire RS-485 black, blue and green wires to the Waveshare RS-485 po
 - Bike RS-485 black wire goes to any Waveshare GND connection - you can use the GND on the I2C connector right next to the RS-485.  But any GND works.
 - Bike RS-485 red wire is left unconnected - although you could use a 9V -> 5V buck converter to power the board from the lower bike circuit board.  But I'm powering it from USB-C.
 
-For the shifters, if you want to use both left and right shifters (4 buttons) you will need to add an I2C GPIO expander.  I opted against this at this time and so I'm just using the right shifter.  These plug into the port labelled UART2 in the upper left corner of the board looking from the rear and is silkscreened "UART1".
+For the shifters, if you want to use both left and right shifters (4 buttons) you will need to add an I2C GPIO expander.  I opted against this at this time and so I'm just using the right shifter.  These plug into the port labelled UART2 in the upper left corner of the board looking from the rear and is silkscreened "UART2".
 - Right Shifter blue wire goes to UART1 white wire silkscreen label TXD
 - Right Shifter green wire goes to UART1 yellow wire silkscreen label RXD
 - Right Shifter yellow wire goes to UART1 black wire silkscreen label GND
@@ -85,9 +85,11 @@ UART1 3V3 - the red wire - is unconnected
 
 That is all the wiring.   You don't *need* to solder them, you could strip them, twist them and cover them with shrink tape or electrical tape.  But ideally you want to solder them.
 
+Move the two yellow jumpers for RS485 one notch over (see photo) to add termination - not sure if it's absolutely needed but it seemed to help and that's how I have mine..  Also flip the switch to move from USB to UART2 - this enables the UART that we plugged the shifter buttons into.
+
 ![Waveshare wiring and 3D printed case](images/wiring_and_case.jpeg)
 
-You will then need to flash the ESP32S3 via the USB connector labelled "USB".  I used VSCode - although I acknowledge that VSCode is intimidating and maybe not the ideal choice if you aren't familiar with it.  I have used VS Code for years and I am still intimidated by it.  But you want to pull it up, create a project in ProjectIO as Arduino, put in the files in the directory structure above with the platformio.ini in the main directory, and and then flash it and build it.   You might be able to get this all working in much less intimidating Arduino IDE, but I use VSCode so I can't help.
+You will then need to flash the ESP32S3 via the USB connector labelled "USB" - make sure to plug into "USB" and not the other USB connector above it.  For Flashing, I used VSCode - although I acknowledge that VSCode is intimidating and maybe not the ideal choice if you aren't familiar with it.  I have used VS Code for years and I am still intimidated by it.  But you want to pull it up, create a project in ProjectIO as Arduino, put in the files in the directory structure above with the platformio.ini in the main directory, and and then flash it and build it.   You might be able to get this all working in much less intimidating Arduino IDE, but I use VSCode so I can't help.
 
 The VSCode screen shout look like this:
 ![VSCode Screen](images/vscode_proform.png)
