@@ -97,6 +97,11 @@ You will then need to flash the ESP32S3 via the USB connector labelled "USB" - m
 The VSCode screen shout look like this:
 ![VSCode Screen](images/vscode_proform.png)
 
+## Future Improvements
+
+I am working on a Proform-like display with 3 dial gauges instead of text output so it looks more like the original Proform screen.  It's a work-in-progress but I have it mostly coded up.  When I finish and test it, I'll replace the project files with the new version which will add this graphical interface.
+
+
 ## Acknowledgements
 
 This project was inspired by the work of @kevinmott09:
