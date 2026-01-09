@@ -88,7 +88,7 @@ UART1 3V3 - the red wire - is unconnected
 
 That is all the wiring.   You don't *need* to solder them, you could strip them, twist them and cover them with shrink tape or electrical tape.  But ideally you want to solder them.
 
-Move the two yellow jumpers for RS485 one notch over (see photo) to add termination - not sure if it's absolutely needed but it seemed to help and that's how I have mine..  Also flip the switch to move from USB to UART2 - this enables the UART that we plugged the shifter buttons into.
+Move the two yellow jumpers for RS485 one notch over (see photo) to remove 120 ohm termination - not sure if it's absolutely needed but it seemed to help and that's how I have mine.  Also flip the switch on the bottom to move from USB to UART2 - this enables the UART2 that the shifter buttons are plugged into.
 
 ![Waveshare wiring and 3D printed case](images/wiring_and_case.jpeg)
 
