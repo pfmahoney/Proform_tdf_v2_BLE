@@ -59,8 +59,11 @@ Other BLE-capable training applications may work but have not been fully tested.
 ---
 
 ## Parts
-- ESP32-S3-Touch-LCD-7 - can be purchased at several places including directly from Waveshare. ~$50   https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-7
-- 3D printed case - you can use this by Sergey Morozov https://www.printables.com/model/1030369-waveshare-esp32-s3-7inch-capacitive-touch-display or else use the .stl here which streches the design to give it a bit more room for stashing wires.   If you use the attached streched design you will need longer M3 screws to attach the screen to the case, although the Waveshare board has adhesive and might work well enough that screws aren't needed.
+- Waveshare ESP32-S3-Touch-LCD-7 - can be purchased at several places including directly from Waveshare and from Amazon. ~$50   https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-7
+- 3D printed case - you can use this by Sergey Morozov https://www.printables.com/model/1030369-waveshare-esp32-s3-7inch-capacitive-touch-display but before I printed it, I streched the design up in the printer slicing to give it a bit more room for stashing wires.   If you use the 3D case you will need M3 screws to attach the screen to the case, although the Waveshare board has adhesive and might work well enough that screws aren't needed but I screwed mine with M3x30 screws.
+- 4 short screws - I used #6 1/2" wood screws - to attach the 3D printed case to the Proform
+- Long USB-C cable to power the Waveshare board
+- USB-C charging block to power it.   It works fine with a 20W charger.
 
 
 ## Installation
