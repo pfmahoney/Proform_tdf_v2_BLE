@@ -107,7 +107,6 @@ I am working on a Proform-like display with 3 dial gauges instead of text output
 This project was inspired by the work of @kevinmott09:
 https://github.com/kevinmott09/proformBLE
 
-This project received advice and code from ChatGPT although it is my design and my project.
-
 While this implementation is a complete rewrite, the original project demonstrated that replacing the factory iFit console on the ProForm TdF platform was feasible and served as the initial inspiration and I used his reverse-engineering of the cadence and resistance values as well as the RS-485 connectivity as the basis for my code.  Without the example from @kevinmott09, there's a high probability my Proform TdF v4 Pro would be headed over to  metal scrap recycling.
 
+This project received advice and code from ChatGPT although it is my design and my project.
