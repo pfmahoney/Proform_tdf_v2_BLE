@@ -3,7 +3,9 @@
 
 This project replaces the original iFit-based display on a ProForm Tour de France Pro 4.0 bicycle trainer from approximately 2012-2016 with a modern ESP32-based controller and display. It converts the trainer from a proprietary Wi-Fi–dependent design into a native Bluetooth Low Energy (BLE) smart trainer which is directly compatible with modern training platforms.  It also resolves an issue where the built-in original Proform iFit display gets stuck in an endless boot-loop and the bike stops working because the display doesn't work any more.   
 
-The system removes the need for Wi-Fi bridges to connect to online cycling apps like Zwift and Rouvy by advertising, receiving, and broadcasting BLE data directly. Training applications such as Zwift and Rouvy can control resistance and elevation while receiving power and cadence data in real time.   I have to add that I have always been grateful to the authors of the data bridges which I have used to connect my Proform TDF 4.0 Pro for years until recently when the interface stopped working.
+The system removes the need for Wi-Fi bridges to connect to online cycling apps like Zwift and Rouvy by advertising, receiving, and broadcasting BLE data directly. Training applications such as Zwift and Rouvy can control resistance and elevation while receiving power and cadence data in real time.   I have to add that I have always been grateful to the authors of the data bridges which I have used to connect my Proform TDF 4.0 Pro for years until recently when the Proform display interface stopped working.
+
+![Image of the board with GUI connected to Zwift](images/IMG_9088.jpeg)
 
 ---
 
@@ -97,10 +99,27 @@ You will then need to flash the ESP32S3.  This is likely to be the hard part if 
 The VSCode screen shout look like this:
 ![VSCode Screen](images/vscode_proform.png)
 
-## Future Improvements
+I have included a "factory-merged.bin" image which should flash without VS Code or Arduino IDE using esptool.
+esptool.py --chip esp32s3 write_flash 0x0 ws_esp32s3_t_lcd7_firmware_factory-merged.bin
 
-I am working on a Proform-like display with 3 dial gauges instead of text output so it looks more like the original Proform screen.  It's a work-in-progress but I have it mostly coded up.  When I finish and test it, I'll replace the project files with the new version which will add this graphical interface.
+Or you can flash using the web interface on Adafruit's website:
+https://adafruit.github.io/Adafruit_WebSerial_ESPTool/
 
+To use the flashing capability on Adafruit's webserial ESPTool:
+   Open the page on a Chrome/Edge/Chromium-based browser - it needs to be a browser that supports webserial
+   Connect to the board.  Keep the speed at 115200.
+   Click Choose a file… for one slot and select factory-merged.bin (downloaded from this github release).
+   Set/verify the Offset is 0x0 (that’s what Adafruit’s own instructions call out).
+  (Recommended) click Erase first 
+   Click Program.
+
+## Future Improvements and known issues
+
+The board sometimes reboots in offline mode when it's not connected to Zwift.  Most of the times it's totally stable.  I am not sure why it does this.  It's on the list to debug.
+The speed and distance calculation is pretty far off from Zwift - this is sort of an unsolvable problem because I can't exactly replicate Zwift's calculation with bike  frames, wheels, drafting, etc.  but I could do better.  But this doesn't affect Zwift operation where the speed/distance are calculated by Zwift.  It's really more of an issue for offline use.   For riding at 0% grade, the calculation is close enough to work for now.  
+The elevation/grade is frequently pretty far off.   The resistance and power are correct, but the grade is often 2x what it's supposed to be.  It's mostly just a visual problem (like the speed/distance).  Zwift knows what it is, and the power calcution seems correct.
+I'd like to upgrade Offline mode to work better. 
+I'd like to calibrate the power calculation with a power meter (but those are expensive!).  Right now it's roughly what feels right.
 
 ## Acknowledgements
 
