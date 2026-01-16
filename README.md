@@ -13,9 +13,11 @@ The system removes the need for Wi-Fi bridges to connect to online cycling apps 
 
 The ProForm TdF Pro 4.0 relies on an embedded iFit display and a Wi-Fi communication model that is increasingly unreliable and unsupported. This project replaces the entire control and communication layer while retaining the original mechanical resistance hardware.
 
-The goal is to extend the useful life of otherwise functional hardware and restore compatibility with current training software.
+In December 2025, my Proform went into this endless boot loop and basically stopped working.  I didn't know what to do, so I looked at Kevin Mott's Proform BLE code, but he has an older Proform version and his didn't seem to work with mine because the RS-485 modbus frames didn't match.  I started changing his code, called mine v2, but I kept changing more and more and then I decided to add a display to it.   Finally I decided that other people might end up in the same situation as I was and I published what I did here.
 
-Specifically the goal is to replace the "ProForm TDF Pro 4.0 Bike 7" Display Touchscreen Console Assembly Ebpf01914" with a ~$50 "Waveshare ESP32-S3 7 LCD"
+If you bike display goes bad or stops connecting to WiFi or there is an issue with the iFit board, but not in the electronics near the pedals and you have a Proform TDF 4.0 Pro, then this project should help you.  If your Proform is not an exact match to my model it might work.  If you have a Proform 1.0 or 2.0, you should use Kevin Mott's Proform_BLE code (see the bottom of this).
+
+The goal of this project is to extend the useful life of otherwise functional hardware and restore compatibility with current training software.  Specifically the goal is to replace the "ProForm TDF Pro 4.0 Bike 7" Display Touchscreen Console Assembly Ebpf01914" with a ~$50 "Waveshare ESP32-S3 7 LCD"
 
 ---
 
@@ -51,10 +53,11 @@ Specifically the goal is to replace the "ProForm TDF Pro 4.0 Bike 7" Display Tou
 
 Note that the motor control to raise and lower the bicycle is not enabled by this code.  Honestly I found it a bit annoying to use for years - I bought the bike thinking it would be cool but after a decade of hearing the motor move the bike up and down, I decided I didn't need that feature any more.   If you really love the bike tilting, it shouldn't be THAT hard to enable it.   But I have it disabled.
 
-### Software
+### Compatible Software
 - Zwift
 - Rouvy
 - MyWhoosh
+- also works standalone without connecting to anything
 
 Other BLE-capable training applications may work but have not been fully tested.
 
