@@ -5,23 +5,19 @@
 // - RS-485 (UART1) interface to ProForm lower control board (status/cadence + resistance control)
 // - BLE FTMS server (Zwift-compatible) using NimBLE
 // - LVGL UI on Waveshare ESP32-S3 Touch LCD 7"
-// - Virtual rear gearing (14 gears) + manual base resistance trim (offline capable)
+// - Virtual rear gearing (14 gears)
 // - Stream-based RS-485 frame parser for low-latency cadence updates
-// - FrameAge display to confirm status-frame freshness
 //
 // Button behavior (active-low with INPUT_PULLUP):
 // - Short press UP/DOWN: shift gear up/down
 // - Long press UP/DOWN: increase/decrease base resistance (manual/offline trim)
 //
-// Notes:
-// - A buzzer is not confirmed to exist on all Waveshare variants. An external passive piezo on BUZZER_PIN to GND
-//   is recommended if no onboard buzzer is present.
 
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 
 #include <lvgl.h>
-#include "esp_panel_board_supported_conf.h"
+#include "ESP_Panel_Conf.h"
 #include "esp_display_panel.hpp"
 #include "lvgl_v8_port.h"
 
@@ -37,9 +33,6 @@ HardwareSerial BikeSerial(1);
 // Buttons (GPIO inputs, active-low)
 static const int BTN_GEAR_UP   = 43;
 static const int BTN_GEAR_DOWN = 44;
-
-// External buzzer / piezo (recommended)
-static const int BUZZER_PIN = 6;
 
 // =======================================================
 // ProForm protocol / polling
@@ -152,12 +145,13 @@ static void sendResistance(uint8_t level0to80) {
 // =======================================================
 
 static const int NUM_GEARS = 14;
-static volatile int gearIndex = 6;  // 0..13 (default ~middle)
+static volatile int gearIndex = 5;  // 0..13 (default ~middle)
 
+// Rebalanced gearing: less unusably-low range, more high-end
 static const float gearRatio[NUM_GEARS] = {
-  0.35f, 0.42f, 0.50f, 0.60f, 0.72f, 0.85f,
-  1.00f, 1.15f, 1.32f, 1.52f, 1.75f, 2.00f,
-  2.25f, 2.50f
+  0.90f, 1.00f, 1.10f, 1.22f, 1.35f, 1.50f,
+  1.65f, 1.82f, 2.00f, 2.20f, 2.42f, 2.66f,
+  2.92f, 3.20f
 };
 
 static volatile uint8_t baseResistance = 0; // 0..80 from grade or manual
@@ -217,36 +211,7 @@ static PressButton btnUp;
 static PressButton btnDn;
 
 // =======================================================
-// Buzzer (Arduino-ESP32 core 3.x LEDC API)
-// =======================================================
-
-static bool beepActive = false;
-static uint32_t beepEndMs = 0;
-
-static void buzzerInit() {
-  pinMode(BUZZER_PIN, OUTPUT);
-  ledcAttach(BUZZER_PIN, 2000 /*Hz*/, 8 /*bits*/);
-  ledcWrite(BUZZER_PIN, 0);
-  ledcWriteTone(BUZZER_PIN, 0);
-}
-
-static void startBeep(uint16_t freqHz = 2200, uint16_t ms = 45) {
-  ledcWriteTone(BUZZER_PIN, freqHz);
-  ledcWrite(BUZZER_PIN, 128);
-  beepActive = true;
-  beepEndMs = millis() + ms;
-}
-
-static void buzzerUpdate() {
-  if (beepActive && (int32_t)(millis() - beepEndMs) >= 0) {
-    ledcWrite(BUZZER_PIN, 0);
-    ledcWriteTone(BUZZER_PIN, 0);
-    beepActive = false;
-  }
-}
-
-// =======================================================
-// Cadence + FrameAge
+// Cadence
 // =======================================================
 
 static volatile uint16_t cadence_rpm = 0;
@@ -276,7 +241,7 @@ static uint16_t decodeCadence(const uint8_t* f, size_t n) {
 // =======================================================
 
 static volatile int16_t power_w = 0;
-static volatile uint16_t speed_x100_kph = 0; // placeholder
+static volatile uint16_t speed_x100_kph = 0; // 0.01 km/h for FTMS
 
 // Shape constants
 static float a = 1900.0f;
@@ -297,6 +262,77 @@ static int16_t estimatePower(uint16_t rpm, uint8_t res) {
 }
 
 // =======================================================
+// Speed/Distance/Elapsed (derived from cadence + virtual gearing)
+// =======================================================
+//
+// Use gearRatio[] as a drivetrain ratio: wheel_rpm = cadence_rpm * gearRatio[gearIndex]
+// Assume a 700c road wheel circumference and integrate distance over time.
+// Elapsed time starts when the user first pedals and never stops thereafter.
+//
+
+static const float WHEEL_CIRCUMFERENCE_M = 2.105f;       // ~700x25c (meters/rev)
+static const float KM_TO_MILES = 0.621371192f;
+
+static volatile float speed_mph = 0.0f;
+static volatile float wheel_rpm = 0.0f;
+
+static float distance_km = 0.0f;
+static float distance_miles = 0.0f;
+
+static bool timerStarted = false;
+static uint32_t pedalStartMs = 0;
+static uint32_t lastDistMs = 0;
+
+static uint32_t elapsedSeconds() {
+  if (!timerStarted) return 0;
+  return (millis() - pedalStartMs) / 1000U;
+}
+
+static void updateSpeedDistanceElapsed() {
+  uint32_t now = millis();
+
+  // Start timer on first detected pedaling (cadence > 0)
+  if (!timerStarted && cadence_rpm > 0) {
+    timerStarted = true;
+    pedalStartMs = now;
+    lastDistMs = now;
+  }
+
+  float ratio = gearRatio[gearIndex];
+  wheel_rpm = (float)cadence_rpm * ratio;
+
+  // speed (kph) = wheel_rpm * circumference(m) * 60 / 1000
+  float speed_kph_f = wheel_rpm * WHEEL_CIRCUMFERENCE_M * (60.0f / 1000.0f);
+  if (speed_kph_f < 0) speed_kph_f = 0;
+
+  // Requested tweak: double speed (and therefore distance)
+  speed_kph_f *= 2.0f;
+
+  speed_mph = speed_kph_f * KM_TO_MILES;
+
+  // FTMS expects 0.01 km/h
+  float sx100 = speed_kph_f * 100.0f;
+  if (sx100 < 0) sx100 = 0;
+  if (sx100 > 65535.0f) sx100 = 65535.0f;
+  speed_x100_kph = (uint16_t)lroundf(sx100);
+
+  // Integrate distance only after timer starts
+  if (timerStarted) {
+    float dt_s = (float)(now - lastDistMs) / 1000.0f;
+    if (dt_s < 0) dt_s = 0;
+    lastDistMs = now;
+
+    // distance_km += speed_kph * hours
+    distance_km += (speed_kph_f * (dt_s / 3600.0f));
+    if (distance_km < 0) distance_km = 0;
+    distance_miles = distance_km * KM_TO_MILES;
+  } else {
+    distance_km = 0.0f;
+    distance_miles = 0.0f;
+  }
+}
+
+// =======================================================
 // BLE FTMS (Zwift)
 // =======================================================
 
@@ -307,16 +343,49 @@ static String systemStatus = "booting";
 static bool simMode = false;
 static uint32_t lastSimMs = 0;
 
+// Target + slew state for SIM base resistance
+static volatile uint8_t targetBaseResistance = 0;
+static float baseResF = 0.0f;
+
 static uint8_t gradeToResistance(float gradePercent) {
-  // clamp -5..15% to 0..80
   float g = gradePercent;
-  if (g < -5) g = -5;
-  if (g > 15) g = 15;
-  float t = (g + 5.0f) / 20.0f;  // 0..1
-  int r = (int)lroundf(t * 80.0f);
-  if (r < 0) r = 0;
-  if (r > 80) r = 80;
-  return (uint8_t)r;
+
+  // Tuneables
+  const float FLAT_BASE  = 24.0f;  // base at 0% grade
+  const float UP_SLOPE   = 2.8f;   // per +1% grade
+  const float DOWN_SLOPE = 1.4f;   // per -1% grade (gentler)
+  const float MIN_BASE   = 12.0f;  // never go below this in SIM
+  const float MAX_BASE   = 80.0f;
+
+  float r = FLAT_BASE + (g >= 0.0f ? (g * UP_SLOPE) : (g * DOWN_SLOPE));
+
+  if (r < MIN_BASE) r = MIN_BASE;
+  if (r > MAX_BASE) r = MAX_BASE;
+  return (uint8_t)lroundf(r);
+}
+
+static void updateBaseResistanceSlew() {
+  if (!simMode) return;
+
+  static uint32_t lastMs = 0;
+  uint32_t now = millis();
+  uint32_t dt = now - lastMs;
+  if (dt < 40) return; // ~25 Hz
+  lastMs = now;
+
+  // Ramp rates in levels/sec (tune to taste)
+  const float UP_PER_SEC   = 6.0f;
+  const float DOWN_PER_SEC = 10.0f;
+
+  float target = (float)targetBaseResistance;
+  float rate = (target > baseResF) ? UP_PER_SEC : DOWN_PER_SEC;
+  float maxStep = rate * ((float)dt / 1000.0f);
+
+  float diff = target - baseResF;
+  if (fabsf(diff) <= maxStep) baseResF = target;
+  else baseResF += (diff > 0 ? maxStep : -maxStep);
+
+  baseResistance = (uint8_t)lroundf(baseResF);
 }
 
 static NimBLEUUID UUID_FTMS_SVC((uint16_t)0x1826);
@@ -387,6 +456,7 @@ class CtrlPointCallbacks : public NimBLECharacteristicCallbacks {
 
           simMode = false;
           baseResistance = lvl;
+          baseResF = (float)baseResistance;
           systemStatus = "FTMS: manual base";
           ctrlPointIndicateResponse(opcode, 0x01);
         } else {
@@ -395,18 +465,17 @@ class CtrlPointCallbacks : public NimBLECharacteristicCallbacks {
         break;
 
       case 0x11: { // Indoor Bike Simulation Parameters (grade)
-        // v layout (little endian):
-        // [1..2] wind speed (0.001 m/s)  int16
-        // [3..4] grade (0.01 %)         int16
-        // [5]    crr (0.0001)          uint8
-        // [6]    cw  (0.01 kg/m)       uint8
         if (v.size() >= 7) {
           int16_t gr = (int16_t)((uint8_t)v[3] | ((uint8_t)v[4] << 8));
 
           // Grade scaling correction (proven in your testing)
           grade_pct = (gr / 100.0f) * 2.0f;
 
-          baseResistance = gradeToResistance(grade_pct);
+          targetBaseResistance = gradeToResistance(grade_pct);
+
+          // On transition into SIM, start slew from current base resistance
+          if (!simMode) baseResF = (float)baseResistance;
+
           simMode = true;
           lastSimMs = millis();
           systemStatus = "FTMS: sim grade";
@@ -455,51 +524,341 @@ static void notifyIndoorBikeData() {
 }
 
 // =======================================================
-// LVGL UI
+// LVGL UI (ProForm-style)
 // =======================================================
 
-static lv_obj_t* lblMain = nullptr;
+#if LV_FONT_MONTSERRAT_64
+extern const lv_font_t lv_font_montserrat_64;
+#define FONT_NUM  (&lv_font_montserrat_64)
+#elif LV_FONT_MONTSERRAT_48
+extern const lv_font_t lv_font_montserrat_48;
+#define FONT_NUM  (&lv_font_montserrat_48)
+#elif LV_FONT_MONTSERRAT_36
+extern const lv_font_t lv_font_montserrat_36;
+#define FONT_NUM  (&lv_font_montserrat_36)
+#elif LV_FONT_MONTSERRAT_28
+extern const lv_font_t lv_font_montserrat_28;
+#define FONT_NUM  (&lv_font_montserrat_28)
+#else
+#define FONT_NUM  LV_FONT_DEFAULT
+#endif
+
+#if LV_FONT_MONTSERRAT_28
+extern const lv_font_t lv_font_montserrat_28;
+#define FONT_LABEL (&lv_font_montserrat_28)
+#elif LV_FONT_MONTSERRAT_20
+extern const lv_font_t lv_font_montserrat_20;
+#define FONT_LABEL (&lv_font_montserrat_20)
+#else
+#define FONT_LABEL LV_FONT_DEFAULT
+#endif
+
+#if LV_FONT_MONTSERRAT_20
+extern const lv_font_t lv_font_montserrat_20;
+#define FONT_SM   (&lv_font_montserrat_20)
+#else
+#define FONT_SM   LV_FONT_DEFAULT
+#endif
+
 static lv_obj_t* lblStatus = nullptr;
+
+// Top tiles (4 equal boxes)
+static lv_obj_t* tileGear = nullptr;
+static lv_obj_t* tileDist = nullptr;
+static lv_obj_t* tileTime = nullptr;
+static lv_obj_t* tileSpeed = nullptr;
+
+static lv_obj_t* lblDistVal = nullptr;
+static lv_obj_t* lblDistUnit = nullptr;
+
+static lv_obj_t* lblTimeVal = nullptr;
+static lv_obj_t* lblTimeUnit = nullptr;
+
+static lv_obj_t* lblGearVal = nullptr;
+static lv_obj_t* lblGearUnit = nullptr;
+
+static lv_obj_t* lblSpeedVal = nullptr;
+static lv_obj_t* lblSpeedUnit = nullptr;
+
+// Gauges
+static lv_obj_t* gSpeed = nullptr;
+static lv_obj_t* gCad = nullptr;
+static lv_obj_t* gWatts = nullptr;
+static lv_obj_t* gGrade = nullptr;
+
+static lv_obj_t* gLblSpeedVal = nullptr;
+static lv_obj_t* gLblCadVal = nullptr;
+static lv_obj_t* gLblWattsVal = nullptr;
+static lv_obj_t* gLblGradeVal = nullptr;
+
+static lv_meter_indicator_t* indSpeed = nullptr;
+static lv_meter_indicator_t* indCad = nullptr;
+static lv_meter_indicator_t* indWatts = nullptr;
+static lv_meter_indicator_t* indGrade = nullptr;
+
+static int32_t clamp_i32(int32_t v, int32_t lo, int32_t hi) {
+  if (v < lo) return lo;
+  if (v > hi) return hi;
+  return v;
+}
+
+static void fmtElapsed(char* out, size_t out_sz, uint32_t sec) {
+  uint32_t h = sec / 3600U;
+  uint32_t m = (sec % 3600U) / 60U;
+  uint32_t s = sec % 60U;
+  if (h > 0) snprintf(out, out_sz, "%u:%02u:%02u", (unsigned)h, (unsigned)m, (unsigned)s);
+  else       snprintf(out, out_sz, "%u:%02u", (unsigned)m, (unsigned)s);
+}
+
+static lv_obj_t* createTile(lv_obj_t* parent, lv_color_t bg, int w, int h) {
+  lv_obj_t* t = lv_obj_create(parent);
+  lv_obj_set_size(t, w, h);
+  lv_obj_set_style_bg_color(t, bg, 0);
+  lv_obj_set_style_border_width(t, 0, 0);
+  lv_obj_set_style_outline_width(t, 0, 0);
+  lv_obj_set_style_shadow_width(t, 0, 0);
+  lv_obj_set_style_radius(t, 0, 0);
+  lv_obj_set_style_pad_all(t, 10, 0);
+  lv_obj_clear_flag(t, LV_OBJ_FLAG_SCROLLABLE);
+  return t;
+}
+
+static lv_obj_t* createGauge(lv_obj_t* parent,
+                            const char* unit,
+                            int32_t vmin, int32_t vmax,
+                            lv_color_t arcColor,
+                            lv_meter_indicator_t** outInd,
+                            lv_obj_t** outValLbl) {
+  lv_obj_t* cont = lv_obj_create(parent);
+  lv_obj_set_size(cont, 180, 220);
+  lv_obj_set_style_radius(cont, 90, 0);
+  lv_obj_set_style_border_width(cont, 0, 0);
+  lv_obj_set_style_outline_width(cont, 0, 0);
+  lv_obj_set_style_shadow_width(cont, 0, 0);
+  lv_obj_set_style_pad_all(cont, 10, 0);
+  lv_obj_set_style_bg_color(cont, lv_color_hex(0xD4D7DE), 0); // light grey
+  lv_obj_set_style_bg_opa(cont, LV_OPA_COVER, 0);
+  lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
+
+  lv_obj_t* m = lv_meter_create(cont);
+  lv_obj_set_size(m, 170, 170);
+  lv_obj_align(m, LV_ALIGN_TOP_MID, 0, -2);
+  lv_obj_set_style_bg_color(m, lv_color_hex(0x111111), 0); // dark face
+  lv_obj_set_style_bg_opa(m, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(m, 0, 0);
+  lv_obj_set_style_outline_width(m, 0, 0);
+  lv_obj_set_style_shadow_width(m, 0, 0);
+  lv_obj_clear_flag(m, LV_OBJ_FLAG_SCROLLABLE);
+
+  lv_meter_scale_t* sc = lv_meter_add_scale(m);
+  lv_meter_set_scale_range(m, sc, vmin, vmax, 180, 180); // top semi-arc
+  lv_meter_set_scale_ticks(m, sc, 0, 0, 0, lv_color_black()); // hide ticks
+
+  // Background arc
+  lv_meter_indicator_t* bg = lv_meter_add_arc(m, sc, 12, lv_color_hex(0x3A3A3A), 0);
+  lv_meter_set_indicator_start_value(m, bg, vmin);
+  lv_meter_set_indicator_end_value(m, bg, vmax);
+
+  // Value arc (fill)
+  lv_meter_indicator_t* fg = lv_meter_add_arc(m, sc, 12, arcColor, 0);
+  lv_meter_set_indicator_start_value(m, fg, vmin);
+  lv_meter_set_indicator_end_value(m, fg, vmin);
+  *outInd = fg;
+
+  // Value label
+  lv_obj_t* v = lv_label_create(cont);
+  lv_obj_set_style_text_font(v, FONT_NUM, 0);
+  lv_obj_set_style_text_color(v, lv_color_white(), 0);
+  lv_label_set_text(v, "0");
+  lv_obj_align(v, LV_ALIGN_CENTER, 0, 10);
+  *outValLbl = v;
+
+  // Unit label (bottom)
+  lv_obj_t* u = lv_label_create(cont);
+  lv_obj_set_style_text_font(u, FONT_SM, 0);
+  lv_obj_set_style_text_color(u, lv_color_hex(0x2A2A2A), 0);
+  lv_label_set_text(u, unit);
+  lv_obj_align(u, LV_ALIGN_BOTTOM_MID, 0, -8);
+
+  return m; // meter object
+}
 
 static void uiCreate() {
   lv_obj_t* scr = lv_scr_act();
-  lv_obj_set_style_pad_all(scr, 14, 0);
+  lv_obj_set_style_pad_all(scr, 0, 0);
+  lv_obj_set_style_bg_color(scr, lv_color_hex(0x6FA9D6), 0); // blue-ish
+  lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(scr, 0, 0);
+  lv_obj_set_style_outline_width(scr, 0, 0);
+  lv_obj_set_style_shadow_width(scr, 0, 0);
+  lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
 
-  lblMain = lv_label_create(scr);
-  lv_obj_align(lblMain, LV_ALIGN_TOP_LEFT, 0, 0);
-  lv_label_set_text(lblMain, "Starting...");
+  // Top bar container
+  lv_obj_t* top = lv_obj_create(scr);
+  lv_obj_set_size(top, lv_pct(100), 118);
+  lv_obj_align(top, LV_ALIGN_TOP_MID, 0, 0);
+  lv_obj_set_style_bg_color(top, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_opa(top, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(top, 0, 0);
+  lv_obj_set_style_outline_width(top, 0, 0);
+  lv_obj_set_style_shadow_width(top, 0, 0);
+  lv_obj_set_style_pad_all(top, 0, 0);
+  lv_obj_set_style_pad_column(top, 0, 0);
+  lv_obj_set_style_pad_row(top, 0, 0);
+  lv_obj_clear_flag(top, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_flex_flow(top, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(top, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
+  // 4 equal tiles, 200px each (800px total)
+  tileGear  = createTile(top, lv_color_hex(0x3B3B3B), 200, 118);
+  tileDist  = createTile(top, lv_color_hex(0xD13B36), 200, 118);
+  tileTime  = createTile(top, lv_color_hex(0xD13B36), 200, 118);
+  tileSpeed = createTile(top, lv_color_hex(0x3B3B3B), 200, 118);
+
+  // Gear tile
+  lblGearUnit = lv_label_create(tileGear);
+  lv_obj_set_style_text_font(lblGearUnit, FONT_LABEL, 0);
+  lv_obj_set_style_text_color(lblGearUnit, lv_color_white(), 0);
+  lv_label_set_text(lblGearUnit, "Gear");
+  lv_obj_align(lblGearUnit, LV_ALIGN_TOP_LEFT, 0, -2);
+
+  lblGearVal = lv_label_create(tileGear);
+  lv_obj_set_style_text_font(lblGearVal, FONT_NUM, 0);
+  lv_obj_set_style_text_color(lblGearVal, lv_color_white(), 0);
+  lv_label_set_text(lblGearVal, "1");
+  lv_obj_align(lblGearVal, LV_ALIGN_BOTTOM_LEFT, 0, -10);
+
+  // Distance tile
+  lblDistUnit = lv_label_create(tileDist);
+  lv_obj_set_style_text_font(lblDistUnit, FONT_LABEL, 0);
+  lv_obj_set_style_text_color(lblDistUnit, lv_color_white(), 0);
+  lv_label_set_text(lblDistUnit, "Distance");
+  lv_obj_align(lblDistUnit, LV_ALIGN_TOP_LEFT, 0, -2);
+
+  lblDistVal = lv_label_create(tileDist);
+  lv_obj_set_style_text_font(lblDistVal, FONT_NUM, 0);
+  lv_obj_set_style_text_color(lblDistVal, lv_color_white(), 0);
+  lv_label_set_text(lblDistVal, "0.00");
+  lv_obj_align(lblDistVal, LV_ALIGN_BOTTOM_LEFT, 0, -10);
+
+  // Time tile
+  lblTimeUnit = lv_label_create(tileTime);
+  lv_obj_set_style_text_font(lblTimeUnit, FONT_LABEL, 0);
+  lv_obj_set_style_text_color(lblTimeUnit, lv_color_white(), 0);
+  lv_label_set_text(lblTimeUnit, "Session time");
+  lv_obj_align(lblTimeUnit, LV_ALIGN_TOP_LEFT, 0, -2);
+
+  lblTimeVal = lv_label_create(tileTime);
+  lv_obj_set_style_text_font(lblTimeVal, FONT_NUM, 0);
+  lv_obj_set_style_text_color(lblTimeVal, lv_color_white(), 0);
+  lv_label_set_text(lblTimeVal, "0:00");
+  lv_obj_align(lblTimeVal, LV_ALIGN_BOTTOM_LEFT, 0, -10);
+
+  // Speed tile
+  lblSpeedUnit = lv_label_create(tileSpeed);
+  lv_obj_set_style_text_font(lblSpeedUnit, FONT_LABEL, 0);
+  lv_obj_set_style_text_color(lblSpeedUnit, lv_color_white(), 0);
+  lv_label_set_text(lblSpeedUnit, "Speed");
+  lv_obj_align(lblSpeedUnit, LV_ALIGN_TOP_LEFT, 0, -2);
+
+  lblSpeedVal = lv_label_create(tileSpeed);
+  lv_obj_set_style_text_font(lblSpeedVal, FONT_NUM, 0);
+  lv_obj_set_style_text_color(lblSpeedVal, lv_color_white(), 0);
+  lv_label_set_text(lblSpeedVal, "0.0");
+  lv_obj_align(lblSpeedVal, LV_ALIGN_BOTTOM_LEFT, 0, -10);
+
+  // Gauges row (middle)
+  lv_obj_t* gRow = lv_obj_create(scr);
+  lv_obj_set_size(gRow, lv_pct(100), 260);
+  lv_obj_align(gRow, LV_ALIGN_CENTER, 0, 44);
+  lv_obj_set_style_bg_opa(gRow, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(gRow, 0, 0);
+  lv_obj_set_style_outline_width(gRow, 0, 0);
+  lv_obj_set_style_shadow_width(gRow, 0, 0);
+  lv_obj_set_style_pad_all(gRow, 12, 0);
+  lv_obj_clear_flag(gRow, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_flex_flow(gRow, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(gRow, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+  gSpeed = createGauge(gRow, "Speed",      0, 40,   lv_palette_main(LV_PALETTE_PURPLE), &indSpeed, &gLblSpeedVal);
+  gCad   = createGauge(gRow, "cadence",    0, 140,  lv_palette_main(LV_PALETTE_CYAN),   &indCad,   &gLblCadVal);
+  gWatts = createGauge(gRow, "watts",      0, 1000, lv_palette_main(LV_PALETTE_ORANGE), &indWatts, &gLblWattsVal);
+  gGrade = createGauge(gRow, "grade (%)", -10, 20,  lv_palette_main(LV_PALETTE_GREEN),  &indGrade, &gLblGradeVal);
+
+  // Bottom status (no divider/lines)
   lblStatus = lv_label_create(scr);
-  lv_obj_align(lblStatus, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+  lv_obj_set_style_text_font(lblStatus, FONT_SM, 0);
+  lv_obj_set_style_text_color(lblStatus, lv_color_white(), 0);
   lv_label_set_text(lblStatus, "Status: booting");
+  lv_obj_align(lblStatus, LV_ALIGN_BOTTOM_LEFT, 10, -8);
 }
 
 static void uiUpdate() {
-  const uint32_t now = millis();
-  const uint32_t frameAge = (lastStatusFrameMs == 0) ? 0 : (now - lastStatusFrameMs);
+  // Top values
+  char distBuf[24];
+  snprintf(distBuf, sizeof(distBuf), "%.2f", (double)distance_miles);
+  lv_label_set_text(lblDistVal, distBuf);
 
-  char a[260];
-  snprintf(a, sizeof(a),
-           "Cadence: %u rpm\n"
-           "Grade: %.1f%%\n"
-           "BaseRes: %u  Gear: %d/%d (x%.2f)\n"
-           "EffRes:  %u\n"
-           "Power:   %d W\n"
-           "BLE: %s  Mode: %s\n"
-           "FrameAge: %ums",
-           (unsigned)cadence_rpm,
-           grade_pct,
-           (unsigned)baseResistance,
-           gearIndex + 1, NUM_GEARS, gearRatio[gearIndex],
-           (unsigned)resistance,
-           (int)power_w,
-           bleConnected ? "conn" : "adv",
-           simMode ? "SIM" : "MAN/OFF",
-           (unsigned)frameAge);
+  char tBuf[24];
+  fmtElapsed(tBuf, sizeof(tBuf), elapsedSeconds());
+  lv_label_set_text(lblTimeVal, tBuf);
 
-  lv_label_set_text(lblMain, a);
+  char spBuf[24];
+  snprintf(spBuf, sizeof(spBuf), "%.1f", (double)speed_mph);
+  lv_label_set_text(lblSpeedVal, spBuf);
 
-  String s = "Status: " + systemStatus;
+  char gBuf[24];
+  snprintf(gBuf, sizeof(gBuf), "%d", gearIndex + 1);
+  lv_label_set_text(lblGearVal, gBuf);
+
+  // Gauges
+  {
+    int32_t v = (int32_t)lroundf(speed_mph);
+    v = clamp_i32(v, 0, 40);
+    lv_meter_set_indicator_end_value(gSpeed, indSpeed, v);
+    char b[16];
+    snprintf(b, sizeof(b), "%.1f", (double)speed_mph);
+    lv_label_set_text(gLblSpeedVal, b);
+  }
+
+  {
+    int32_t v = (int32_t)cadence_rpm;
+    v = clamp_i32(v, 0, 140);
+    lv_meter_set_indicator_end_value(gCad, indCad, v);
+    char b[16];
+    snprintf(b, sizeof(b), "%u", (unsigned)cadence_rpm);
+    lv_label_set_text(gLblCadVal, b);
+  }
+
+  {
+    int32_t v = (int32_t)power_w;
+    v = clamp_i32(v, 0, 1000);
+    lv_meter_set_indicator_end_value(gWatts, indWatts, v);
+    char b[16];
+    snprintf(b, sizeof(b), "%d", (int)power_w);
+    lv_label_set_text(gLblWattsVal, b);
+  }
+
+  // Grade gauge: display-only x2 (no calculation changes elsewhere)
+  {
+    float grade_disp = grade_pct * 2.0f;
+    int32_t v = (int32_t)lroundf(grade_disp);
+    v = clamp_i32(v, -10, 20);
+    lv_meter_set_indicator_end_value(gGrade, indGrade, v);
+    char b[16];
+    snprintf(b, sizeof(b), "%.1f", (double)grade_disp);
+    lv_label_set_text(gLblGradeVal, b);
+  }
+
+  // Status line: enforce booting -> BLE advertising -> BLE connected progression
+  String shown = systemStatus;
+  if (!bleConnected) {
+    if (shown != "booting" && !shown.endsWith("FAIL")) {
+      shown = "BLE advertising";
+    }
+  }
+
+  String s = "Status: " + shown;
   lv_label_set_text(lblStatus, s.c_str());
 }
 
@@ -573,26 +932,24 @@ static void handleButtons() {
   if (upEv == 1) {
     if (gearIndex < NUM_GEARS - 1) gearIndex++;
     systemStatus = "Shift UP";
-    startBeep(2600, 45);
   }
   if (dnEv == 1) {
     if (gearIndex > 0) gearIndex--;
     systemStatus = "Shift DOWN";
-    startBeep(1800, 45);
   }
 
   // Long press: base resistance trim (offline/manual)
   if (upEv == 2) {
     if (baseResistance < 80) baseResistance++;
     simMode = false;
+    baseResF = (float)baseResistance;
     systemStatus = "BaseRes +";
-    startBeep(3000, 35);
   }
   if (dnEv == 2) {
     if (baseResistance > 0) baseResistance--;
     simMode = false;
+    baseResF = (float)baseResistance;
     systemStatus = "BaseRes -";
-    startBeep(1400, 35);
   }
 }
 
@@ -606,10 +963,11 @@ void setup() {
   Serial.begin(115200);
   delay(200);
 
-  // Buttons and buzzer
+  systemStatus = "booting";
+
+  // Buttons
   btnUp.begin(BTN_GEAR_UP);
   btnDn.begin(BTN_GEAR_DOWN);
-  buzzerInit();
 
   // RS-485 UART
   BikeSerial.setRxBufferSize(2048);
@@ -619,7 +977,6 @@ void setup() {
   InitializeGears();
 
   // Display init
-  systemStatus = "init panel";
   g_board = new esp_panel::board::Board();
   if (!g_board->init() || !g_board->begin()) {
     systemStatus = "panel FAIL";
@@ -639,7 +996,6 @@ void setup() {
   lvgl_port_unlock();
 
   // BLE FTMS init
-  systemStatus = "init BLE";
   NimBLEDevice::init("Proform TDF v2");
   NimBLEDevice::setPower(ESP_PWR_LVL_P9);
 
@@ -671,13 +1027,18 @@ void setup() {
   adv->setScanResponse(true);
   adv->start();
 
-  systemStatus = "ready (adv)";
+  baseResF = (float)baseResistance;
+  targetBaseResistance = baseResistance;
+
+  systemStatus = "BLE advertising";
 }
 
 void loop() {
-  // Buttons + buzzer
+  // Buttons
   handleButtons();
-  buzzerUpdate();
+
+  // SIM slew update (ramps baseResistance toward targetBaseResistance)
+  updateBaseResistanceSlew();
 
   // Effective resistance after gearing
   resistance = applyGearing(baseResistance, gearIndex);
@@ -715,6 +1076,9 @@ void loop() {
     cadence_rpm = (uint16_t)lroundf(cad_ema);
     power_w = estimatePower(cadence_rpm, resistance);
   }
+
+  // Update derived speed/distance/elapsed (cadence + gearRatio -> wheel RPM -> speed + distance)
+  updateSpeedDistanceElapsed();
 
   // BLE notify
   static uint32_t lastBle = 0;
