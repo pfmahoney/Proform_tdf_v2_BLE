@@ -120,11 +120,11 @@ If you want to modify the code or control the flashing better or try a different
 
 ## Future Improvements and known issues
 
-The board sometimes reboots in offline mode when it's not connected to Zwift.  Most of the times it's totally stable.  I am not sure why it does this.  It's on the list to debug.
-The speed and distance calculation is pretty far off from Zwift - this is sort of an unsolvable problem because I can't exactly replicate Zwift's calculation with bike  frames, wheels, drafting, etc.  but I could do better.  But this doesn't affect Zwift operation where the speed/distance are calculated by Zwift.  It's really more of an issue for offline use.   For riding at 0% grade, the calculation is close enough to work for now.  
-The elevation/grade is frequently pretty far off.   The resistance and power are correct, but the grade is often 2x what it's supposed to be.  It's mostly just a visual problem (like the speed/distance).  Zwift knows what it is, and the power calcution seems correct.
-I'd like to upgrade Offline mode to work better. 
-I'd like to calibrate the power calculation with a power meter (but those are expensive!).  Right now it's roughly what feels right.
+- The board sometimes reboots in offline mode when it's not connected to Zwift.  Most of the times it's totally stable.  I am not sure why it does this.  It's on the list to debug.
+- The speed and distance calculation is pretty far off from Zwift - this is sort of an unsolvable problem because I can't exactly replicate Zwift's calculation with bike  frames, wheels, drafting, etc.  but I could do better.  But this doesn't affect Zwift operation where the speed/distance are calculated by Zwift.  It's really more of an issue for offline use.   For riding at 0% grade, the calculation is close enough to work for now.  
+- The elevation/grade is frequently pretty far off.   The resistance and power are correct, but the grade is often 2x what it's supposed to be.  It's mostly just a visual problem (like the speed/distance).  Zwift knows what it is, and the power calcution seems correct.
+- I'd like to upgrade Offline mode to work better. 
+- I'd like to calibrate the power calculation with a power meter (but those are expensive!).  Right now it's roughly what feels right.  It feels a bit generous as it is but it's not too far off.   I thought the original Proform was kind of generous with it's power calculation but I've never actually used a real power meter so I'm not sure.
 
 ## Acknowledgements
 
