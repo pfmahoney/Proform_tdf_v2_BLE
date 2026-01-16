@@ -116,7 +116,7 @@ To use the flashing capability on Adafruit's webserial ESPTool:
 - (Recommended) click Erase first 
 -  Click Program.
 
-Lastly you could load the code up in VS Code using the included Github files.
+If you want to modify the code or control the flashing better or try a different device other than this specific board, you could clone the github project or download it and then load the code up in VS Code using the included Github files.  I used Arduino and PlatformIO and there's a platformio.ini for the libraries.
 
 ## Future Improvements and known issues
 
