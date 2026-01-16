@@ -101,7 +101,8 @@ As noted in the parts list, you will want a case.  I 3D printed mine.  There are
 
 You will then need to flash the ESP32S3.  This is likely to be the hard part if you are not familiar with flashing ESP32 devices.   
 
-I have included a "factory-merged.bin" image which should flash without VS Code or Arduino IDE using esptool.
+I have included a "factory-merged.bin" image which should flash without VS Code or Arduino IDE using esptool - which you can download for most operating systems:
+
 esptool.py --chip esp32s3 write_flash 0x0 ws_esp32s3_t_lcd7_firmware_factory-merged.bin
 
 Or you can flash using the web interface on Adafruit's website:
@@ -109,7 +110,7 @@ https://adafruit.github.io/Adafruit_WebSerial_ESPTool/
 
 To use the flashing capability on Adafruit's webserial ESPTool:
    Open the page on a Chrome/Edge/Chromium-based browser - it needs to be a browser that supports webserial
-   Connect to the board.  Keep the speed at 115200.
+   Connect to the board via the USB port (not the top one, but the one below it labelled USB).  The website should see the board.  Keep the speed at 115200.
    Click Choose a file… for one slot and select factory-merged.bin (downloaded from this github release).
    Set/verify the Offset is 0x0 (that’s what Adafruit’s own instructions call out).
   (Recommended) click Erase first 
