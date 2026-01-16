@@ -109,12 +109,12 @@ Or you can flash using the web interface on Adafruit's website:
 https://adafruit.github.io/Adafruit_WebSerial_ESPTool/
 
 To use the flashing capability on Adafruit's webserial ESPTool:
-   Open the page on a Chrome/Edge/Chromium-based browser - it needs to be a browser that supports webserial
-   Connect to the board via the USB port (not the top one, but the one below it labelled USB).  The website should see the board.  Keep the speed at 115200.
-   Click Choose a file… for one slot and select factory-merged.bin (downloaded from this github release).
-   Set/verify the Offset is 0x0 (that’s what Adafruit’s own instructions call out).
-  (Recommended) click Erase first 
-   Click Program.
+- Open the page on a Chrome/Edge/Chromium-based browser - it needs to be a browser that supports webserial
+-  Connect to the board via the USB port (not the top one, but the one below it labelled USB).  The website should see the board.  Keep the speed at 115200.
+-  Click Choose a file… for one slot and select factory-merged.bin (downloaded from this github release).
+-  Set/verify the Offset is 0x0 (that’s what Adafruit’s own instructions call out).
+- (Recommended) click Erase first 
+-  Click Program.
 
 Lastly you could load the code up in VS Code using the included Github files.
 
