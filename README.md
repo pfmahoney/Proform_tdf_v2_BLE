@@ -81,10 +81,10 @@ Connect the 4-wire RS-485 black, blue and green wires to the Waveshare RS-485 po
 - Bike RS-485 red wire is left unconnected - although you could use a 9V -> 5V buck converter to power the board from the lower bike circuit board.  But I'm powering it from USB-C.
 
 For the shifters, if you want to use both left and right shifters (4 buttons) you will need to add an I2C GPIO expander.  I opted against this at this time and so I'm just using the right shifter.  These plug into the port labelled UART2 in the upper left corner of the board looking from the rear and is silkscreened "UART2".
-- Right Shifter blue wire goes to UART1 white wire silkscreen label TXD
-- Right Shifter green wire goes to UART1 yellow wire silkscreen label RXD
-- Right Shifter yellow wire goes to UART1 black wire silkscreen label GND
-UART1 3V3 - the red wire - is unconnected
+- Right Shifter blue wire goes to UART2 white wire silkscreen label TXD
+- Right Shifter green wire goes to UART2 yellow wire silkscreen label RXD
+- Right Shifter yellow wire goes to UART2 black wire silkscreen label GND
+UART2 3V3 - the red wire - is unconnected
 
 That is all the wiring.   You don't *need* to solder them, you could strip them, twist them and cover them with shrink tape or electrical tape.  But ideally you want to solder them.
 
@@ -108,5 +108,7 @@ This project was inspired by the work of @kevinmott09:
 https://github.com/kevinmott09/proformBLE
 
 While this implementation is a complete rewrite, the original project demonstrated that replacing the factory iFit console on the ProForm TdF platform was feasible and served as the initial inspiration and I used his reverse-engineering of the cadence and resistance values as well as the RS-485 connectivity as the basis for my code.  Without the example from @kevinmott09, there's a high probability my Proform TdF v4 Pro would be headed over to  metal scrap recycling.
+
+The project is grateful to Dan Bee (TDF Data Bridge) and Roberto Viola (qdomyos-zwift) for their data bridge software which I have used for years.  Without them, I'd have sold or donated or scrapped the bicycle years ago.   With the access to the data bridges, I could ride in Zwift and that gave new life to the bike.
 
 This project received advice and code from ChatGPT although it is my design and my project.
