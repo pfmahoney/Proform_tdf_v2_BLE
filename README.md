@@ -95,12 +95,11 @@ That is all the wiring.   You don't *need* to solder them, you could strip them,
 
 Move the two yellow jumpers for RS485 one notch over (see photo) to remove 120 ohm termination - not sure if it's absolutely needed but it seemed to help and that's how I have mine.  Also flip the switch on the bottom to move from USB to UART2 - this enables the UART2 that the shifter buttons are plugged into.
 
+As noted in the parts list, you will want a case.  I 3D printed mine.  There are commercially available cases for this board.  You could also just mount it to wood.   But I think a 3D printed case looks and works the best.  For connecting the case to the bike, I used 4 wood screws.  But you could double-sided tape it, or hot glue gun it.  
+
 ![Waveshare wiring and 3D printed case](images/wiring_and_case.jpeg)
 
-You will then need to flash the ESP32S3.  This is likely to be the hard part if you are not familiar with flashing ESP32 devices.   First you need to load the programs attached to this Github to the correct directories in your ESP32 flashing program.   Then connect via the USB connector labelled "USB" - make sure to plug into "USB" and not the other USB connector above it.  For Flashing, I used VSCode - although I acknowledge that VSCode is intimidating and maybe not the ideal choice if you aren't familiar with it.  I have used VS Code for years and I am still intimidated by it.  But you want to pull it up, create a project in ProjectIO as Arduino, put in the files in the directory structure above with the platformio.ini in the main directory, and and then flash it and build it.   You might be able to get this all working in much less intimidating Arduino IDE, but I use VSCode.  I was thinking about trying to upload a compiled firmware file which would be easier and then I can include easier instructions for using just a flashing program instead of a program to compile the code and flash it.   For what it's worth, this is my first project uploaded to Github and I'm new to all of this.  :)
-
-The VSCode screen shout look like this:
-![VSCode Screen](images/vscode_proform.png)
+You will then need to flash the ESP32S3.  This is likely to be the hard part if you are not familiar with flashing ESP32 devices.   
 
 I have included a "factory-merged.bin" image which should flash without VS Code or Arduino IDE using esptool.
 esptool.py --chip esp32s3 write_flash 0x0 ws_esp32s3_t_lcd7_firmware_factory-merged.bin
@@ -115,6 +114,8 @@ To use the flashing capability on Adafruit's webserial ESPTool:
    Set/verify the Offset is 0x0 (that’s what Adafruit’s own instructions call out).
   (Recommended) click Erase first 
    Click Program.
+
+Lastly you could load the code up in VS Code using the included Github files.
 
 ## Future Improvements and known issues
 
@@ -134,3 +135,7 @@ While this implementation is a complete rewrite, the original project demonstrat
 The project is grateful to Dan Bee (TDF Data Bridge) and Roberto Viola (qdomyos-zwift) for their data bridge software which I have used for years.  Without them, I'd have sold or donated or scrapped the bicycle years ago.   With the access to the data bridges, I could ride in Zwift and that gave new life to the bike.
 
 This project received advice and code from ChatGPT although it is my design and my project.
+
+## Licence
+
+This code and this entire project are licensed for non-commercial use under the PolyForm Noncommercial 1.0.0 license.  Users are free to modify, download, update the source but if you want to sell a device based on this code please contact Patrick Mahoney
